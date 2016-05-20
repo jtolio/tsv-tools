@@ -1,0 +1,304 @@
+#!/usr/bin/env python2
+#
+# Copyright 2016 JT Olds
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+import os
+import sys
+import errno
+import argparse
+import itertools
+from collections import defaultdict
+
+
+def body(input):
+  next(input)
+  for line in input:
+    print line.rstrip("\n")
+
+
+def cat(inputs, join):
+  if not inputs: return
+
+  headers = []
+  lookups = []
+  for input in inputs:
+    field_counter = defaultdict(lambda: 0)
+    header, lookup = [], {}
+    for field in next(input).rstrip("\n").split("\t"):
+      reference = (field, field_counter[field])
+      field_counter[field] += 1
+      lookup[reference] = len(header)
+      header.append(reference)
+    headers.append(tuple(header))
+    lookups.append(lookup)
+
+  if join in ("x", "exact"):
+    chosen_header = headers[0]
+    candidate = set(headers[0])
+    for header in headers[1:]:
+      if candidate != set(header):
+        print >>sys.stderr, "Error: headers do not match"
+        return 1
+
+  elif join in ("i", "intersect", "intersection"):
+    candidate = set(headers[0])
+    for header in headers[1:]:
+      candidate.intersection_update(set(header))
+
+    if not candidate:
+      print >>sys.stderr, "Error: no overlapping columns"
+      return 0
+
+    chosen_header = tuple(ref for ref in headers[0] if ref in candidate)
+
+  else:
+    assert join in ("u", "union")
+    candidate = set()
+    chosen_header = []
+    for header in headers:
+      for ref in header:
+        if ref not in candidate:
+          candidate.add(ref)
+          chosen_header.append(ref)
+    chosen_header = tuple(chosen_header)
+
+  print "\t".join(field for field, _ in chosen_header)
+
+  for i, input in enumerate(inputs):
+    if headers[i] == chosen_header:
+      for line in input:
+        sys.stdout.write(line)
+      continue
+
+    for line in input:
+      fields = line.rstrip("\n").split("\t")
+
+      parts = []
+      for reference in chosen_header:
+        if reference in lookups[i] and lookups[i][reference] < len(fields):
+          parts.append(fields[lookups[i][reference]])
+        else:
+          parts.append("")
+
+      print "\t".join(parts)
+
+
+def _get_header(input):
+  header = next(input).rstrip("\n")
+
+  lookup = defaultdict(list)
+  for pos, name in enumerate(header.split("\t")):
+    if name:
+      lookup[name].append(pos)
+
+  return header, lookup
+
+
+def columns(input, columns):
+  header, lookup = _get_header(input)
+
+  names = []
+  for column in columns:
+    for _ in lookup[column]:
+      names.append(column)
+
+  print "\t".join(names)
+
+  for line in input:
+    fields = line.rstrip("\n").split("\t")
+
+    parts = []
+    for column in columns:
+      for pos in lookup[column]:
+        if pos < len(fields):
+          parts.append(fields[pos])
+        else:
+          parts.append("")
+
+    print "\t".join(parts)
+
+
+def display(input, justify, initial_rows):
+  max_widths = {}
+  just = {"left": "ljust", "right": "rjust", "center": "center"}[justify]
+
+  def process():
+    for line in input:
+      fields = line.rstrip("\n").split("\t")
+      for field_id, field in enumerate(fields):
+        max_widths[field_id] = max(max_widths.get(field_id, 0), len(field))
+      yield fields
+
+  processor = process()
+
+  for fields in itertools.chain(
+      list(itertools.islice(processor, initial_rows)), processor):
+    print " ".join((
+        getattr(field, just)(max_widths[field_id])
+        for field_id, field in enumerate(fields)))
+
+
+def _numerical(cmp):
+  def wrapped(x, y):
+    try:
+      int(x), int(y)
+    except:
+      pass
+    else:
+      return cmp(int(x), int(y))
+    try:
+      float(x), float(y)
+    except:
+      pass
+    else:
+      return cmp(float(x), float(y))
+    return cmp(x, y)
+  return wrapped
+
+
+def _fileset(name, filename, _cache={}):
+  if filename not in _cache:
+    names = set()
+    for line in file(filename):
+      line = line.strip()
+      if line: names.add(line)
+    _cache[filename] = names
+  return name in _cache[filename]
+
+
+COMPARISONS = {
+  "=": _numerical(lambda x, y: x == y),
+  "==": _numerical(lambda x, y: x == y),
+  "!=": _numerical(lambda x, y: x != y),
+  "<=": _numerical(lambda x, y: x <= y),
+  ">=": _numerical(lambda x, y: x >= y),
+  "<": _numerical(lambda x, y: x < y),
+  ">": _numerical(lambda x, y: x > y),
+  " in ": _fileset,
+  " not in ": lambda x, y: not _fileset(x, y),
+}
+
+
+def filter(input, selectors):
+  comparisons = list(sorted(COMPARISONS.keys(), key=len, reverse=True))
+
+  selections = []
+  for selector in selectors:
+    found = False
+    for comp in comparisons:
+      if comp not in selector:
+        continue
+      key, val = selector.split(comp)
+      selections.append((key.strip(), COMPARISONS[comp], val.strip()))
+      found = True
+      break
+    if not found:
+      print >>sys.stderr, "Error: unknown selector %r", selector
+      return 1
+
+  header, lookup = _get_header(input)
+  print header
+
+  for line in input:
+    line = line.rstrip("\n")
+    fields = line.split("\t")
+    good = True
+    for key, comp, val in selections:
+      for pos in lookup[key]:
+        if pos >= len(fields) or not comp(fields[pos].strip(), val):
+          good = False
+          break
+    if good:
+      print line
+
+
+def header(input):
+  print next(input).rstrip("\n")
+
+
+def main():
+  parser = argparse.ArgumentParser(prog="tsv")
+  subparsers = parser.add_subparsers(help="subcommand help", dest="subcommand")
+
+  def pos_input(parser):
+    parser.add_argument(
+        "input", nargs="?", type=argparse.FileType("r"), default=sys.stdin,
+        help="the path to read. if not provided, reads from stdin")
+
+  def opt_input(parser):
+    parser.add_argument(
+        "-i", "--input", type=argparse.FileType("r"), default=sys.stdin,
+        help="the path to read. if not provided, reads from stdin")
+
+  parser_body = subparsers.add_parser("body", help="body help")
+  pos_input(parser_body)
+
+  parser_cat = subparsers.add_parser("cat", help="cat help")
+  parser_cat.add_argument(
+      "-j", "--join", choices=["x", "exact", "u", "union", "i", "intersect"],
+      default="exact",
+      help=("how to join two tables with different columns. x/exact will fail "
+            "if the column headers don't match."))
+  parser_cat.add_argument(
+      "inputs", nargs="*", type=argparse.FileType("r"), default=[sys.stdin],
+      metavar="input",
+      help="the path(s) to read. if not provided, reads from stdin")
+
+  parser_columns = subparsers.add_parser("columns", help="columns help")
+  opt_input(parser_columns)
+  parser_columns.add_argument(
+      "columns", nargs="+", metavar="column", help="a column to output")
+
+  parser_display = subparsers.add_parser(
+      "display", help="display help",
+      description=("nicely format tab-separated data without loading "
+                   "everything into ram"))
+  opt_input(parser_display)
+  parser_display.add_argument(
+      "-j", "--justify", choices=["left", "right", "center"], default="left",
+      help="what kind of justification to apply to each column")
+  parser_display.add_argument(
+      "-r", "--initial-rows", type=int, metavar="rows",
+      help="how much input to read before starting output", default=100)
+
+  parser_filter = subparsers.add_parser("filter", help="filter help")
+  opt_input(parser_filter)
+  parser_filter.add_argument(
+      "selectors", metavar="selector", nargs="+",
+      help="a constraint to filter the data with")
+
+  parser_header = subparsers.add_parser("header", help="header help")
+  pos_input(parser_header)
+
+  args = sys.argv[:]
+  if os.path.basename(args[0]).startswith("tsv-"):
+    args[0] = os.path.basename(args[0])[4:]
+  else:
+    args = args[1:]
+
+  args = parser.parse_args(args).__dict__
+  try:
+    rv = globals()[args.pop("subcommand")](**args)
+  except IOError as e:
+    if e.errno != errno.EPIPE:
+      raise
+  else:
+    if rv is not None:
+      sys.exit(rv)
+
+
+if __name__ == "__main__":
+  main()
