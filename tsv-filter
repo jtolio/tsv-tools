@@ -1,0 +1,71 @@
+#!/usr/bin/env python2
+
+import sys
+import argparse
+
+
+def celleq(x, y):
+  if x == y: return True
+  try:
+    x = float(x)
+    y = float(y)
+  except ValueError: return False
+  return x == y
+
+
+def fileset(name, filename, _cache={}):
+  if filename not in _cache:
+    names = set()
+    for line in file(filename):
+      line = line.strip()
+      if line: names.add(line)
+    _cache[filename] = names
+  return name in _cache[filename]
+
+
+COMPARISON = {
+  "=":  celleq,
+  "==": celleq,
+  "!=": lambda x, y: not celleq(x, y),
+  "<=": lambda x, y: float(x) <= float(y),
+  ">=": lambda x, y: float(x) >= float(y),
+  "<":  lambda x, y: float(x) < float(y),
+  ">":  lambda x, y: float(x) > float(y),
+  " in ": fileset,
+}
+
+
+def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('selectors', nargs='*')
+  args = parser.parse_args()
+
+  selectors = []
+  for selector in args.selectors:
+    found = False
+    for comp in ("!=", "<=", ">=", "<", ">", "==", "=", " in "):
+      if comp in selector:
+        key, val = selector.split(comp)
+        selectors.append((key.strip(), COMPARISON[comp], val.strip()))
+        found = True
+        break
+    assert found, "Unknown selector %r" % selector
+
+  header = next(sys.stdin).strip("\n")
+  lookup = dict(map(tuple, map(reversed, enumerate(header.split("\t")))))
+
+  print header
+  for line in sys.stdin:
+    line = line.strip("\n")
+    fields = line.split("\t")
+    good = True
+    for key, comp, val in selectors:
+      if not comp(fields[lookup[key]], val):
+        good = False
+        break
+    if good:
+      print line
+
+
+if __name__ == "__main__":
+  main()

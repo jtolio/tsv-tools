@@ -1,0 +1,28 @@
+#!/usr/bin/env python2
+
+import sys
+import argparse
+
+
+def main():
+  parser = argparse.ArgumentParser()
+  parser.add_argument('paths', nargs='*')
+  args = parser.parse_args()
+
+  inputs = [file(path) for path in args.paths]
+  if not inputs:
+    inputs.append(sys.stdin)
+
+  approved_header = None
+  for input in inputs:
+    header = next(input).strip("\n")
+    if approved_header is None:
+      approved_header = header
+      print header
+    assert header == approved_header, "Headers don't match"
+    for line in input:
+      print line.strip("\n")
+
+
+if __name__ == "__main__":
+  main()
