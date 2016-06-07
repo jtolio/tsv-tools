@@ -213,7 +213,7 @@ def filter(input, selectors, case_insensitive):
       found = True
       break
     if not found:
-      print >>sys.stderr, "Error: unknown selector %r", selector
+      print >>sys.stderr, "Error: unknown selector %r" % selector
       return 1
 
   header, lookup = _get_header(input)
