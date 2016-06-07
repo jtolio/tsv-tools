@@ -189,6 +189,12 @@ COMPARISONS = {
   ">": _numerical(lambda x, y: x > y),
   " in ": _fileset,
   " not in ": lambda x, y: not _fileset(x, y),
+  " contains ": lambda x, y: y in x,
+  " not contains ": lambda x, y: y not in x,
+  " starts with ": lambda x, y: x.startswith(y),
+  " not starts with ": lambda x, y: not x.startswith(y),
+  " endswith ": lambda x, y: x.endswith(y),
+  " not ends with ": lambda x, y: not x.endswith(y),
 }
 
 
