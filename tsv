@@ -192,7 +192,7 @@ COMPARISONS = {
 }
 
 
-def filter(input, selectors):
+def filter(input, selectors, case_insensitive):
   comparisons = list(sorted(COMPARISONS.keys(), key=len, reverse=True))
 
   selections = []
@@ -202,6 +202,7 @@ def filter(input, selectors):
       if comp not in selector:
         continue
       key, val = selector.split(comp)
+      if case_insensitive: val = val.lower()
       selections.append((key.strip(), COMPARISONS[comp], val.strip()))
       found = True
       break
@@ -218,7 +219,12 @@ def filter(input, selectors):
     good = True
     for key, comp, val in selections:
       for pos in lookup[key]:
-        if pos >= len(fields) or not comp(fields[pos].strip(), val):
+        if pos >= len(fields):
+          good = False
+          break
+        row_val = fields[pos].strip()
+        if case_insensitive: row_val = row_val.lower()
+        if not comp(row_val, val):
           good = False
           break
     if good:
@@ -276,6 +282,9 @@ def main():
 
   parser_filter = subparsers.add_parser("filter", help="filter help")
   opt_input(parser_filter)
+  parser_filter.add_argument(
+      "-c", "--case-insensitive", action="store_true",
+      help="whether or not filtering should happen case insensitively")
   parser_filter.add_argument(
       "selectors", metavar="selector", nargs="+",
       help="a constraint to filter the data with")
