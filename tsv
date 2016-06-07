@@ -23,10 +23,52 @@ import itertools
 from collections import defaultdict
 
 
+class TSV(object):
+
+  def __init__(self, fh):
+    if isinstance(fh, basestring):
+      fh = file(fh)
+    self._lines = iter(fh)
+    self._header = next(self._lines).rstrip("\r\n")
+    self._lookup = defaultdict(list)
+    for pos, name in enumerate(self._header.split("\t")):
+      if name:
+        self._lookup[name].append(pos)
+
+  def __iter__(self):
+    return self
+
+  def next(self):
+    fields = next(self._lines).rstrip("\r\n").split("\t")
+    item = {}
+    for i, field in enumerate(fields):
+      item[i] = field
+    for name, pos_list in self._lookup.iteritems():
+      filtered = [fields[pos] for pos in pos_list if pos < len(fields)]
+      if not filtered: continue
+      if len(filtered) == 1:
+        item[name] = filtered[0]
+      else:
+        item[name] = filtered
+    return item
+
+
 def body(input):
   next(input)
   for line in input:
-    print line.rstrip("\n")
+    print line.rstrip("\r\n")
+
+
+def uniq(input):
+  header = next(input).rstrip("\r\n")
+  lines = [line.rstrip("\r\n") for line in input]
+  lines.sort()
+  last = None
+  print header
+  for line in lines:
+    if line == last: continue
+    last = line
+    print line
 
 
 def cat(inputs, join):
@@ -37,7 +79,7 @@ def cat(inputs, join):
   for input in inputs:
     field_counter = defaultdict(lambda: 0)
     header, lookup = [], {}
-    for field in next(input).rstrip("\n").split("\t"):
+    for field in next(input).rstrip("\r\n").split("\t"):
       reference = (field, field_counter[field])
       field_counter[field] += 1
       lookup[reference] = len(header)
@@ -84,7 +126,7 @@ def cat(inputs, join):
       continue
 
     for line in input:
-      fields = line.rstrip("\n").split("\t")
+      fields = line.rstrip("\r\n").split("\t")
 
       parts = []
       for reference in chosen_header:
@@ -97,7 +139,7 @@ def cat(inputs, join):
 
 
 def _get_header(input):
-  header = next(input).rstrip("\n")
+  header = next(input).rstrip("\r\n")
 
   lookup = defaultdict(list)
   for pos, name in enumerate(header.split("\t")):
@@ -118,7 +160,7 @@ def columns(input, columns):
   print "\t".join(names)
 
   for line in input:
-    fields = line.rstrip("\n").split("\t")
+    fields = line.rstrip("\r\n").split("\t")
 
     parts = []
     for column in columns:
@@ -137,7 +179,7 @@ def display(input, justify, initial_rows):
 
   def process():
     for line in input:
-      fields = line.rstrip("\n").split("\t")
+      fields = line.rstrip("\r\n").split("\t")
       for field_id, field in enumerate(fields):
         max_widths[field_id] = max(max_widths.get(field_id, 0), len(field))
       yield fields
@@ -220,7 +262,7 @@ def filter(input, selectors, case_insensitive):
   print header
 
   for line in input:
-    line = line.rstrip("\n")
+    line = line.rstrip("\r\n")
     fields = line.split("\t")
     good = True
     for key, comp, val in selections:
@@ -238,7 +280,7 @@ def filter(input, selectors, case_insensitive):
 
 
 def header(input):
-  print next(input).rstrip("\n")
+  print next(input).rstrip("\r\n")
 
 
 def main():
@@ -297,6 +339,9 @@ def main():
 
   parser_header = subparsers.add_parser("header", help="header help")
   pos_input(parser_header)
+
+  parser_uniq = subparsers.add_parser("uniq", help="uniq help")
+  pos_input(parser_uniq)
 
   args = sys.argv[:]
   if os.path.basename(args[0]).startswith("tsv-"):
