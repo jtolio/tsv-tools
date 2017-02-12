@@ -283,6 +283,30 @@ def header(input):
   print next(input).rstrip("\r\n")
 
 
+def sort(input, column, numeric, reverse):
+  header, lookup = _get_header(input)
+  print header
+
+  rows = []
+  for line in input:
+    line = line.rstrip("\r\n")
+    fields = line.split("\t")
+    rows.append(fields)
+
+  def row_key(row):
+    indexes = lookup[column]
+    if not indexes: return None
+    key = row[indexes[0]]
+    if numeric:
+      key = float(key)
+    return key
+
+  rows.sort(key=row_key, reverse=reverse)
+
+  for row in rows:
+    print "\t".join(row)
+
+
 def main():
   parser = argparse.ArgumentParser(prog="tsv")
   subparsers = parser.add_subparsers(help="subcommand help", dest="subcommand")
@@ -315,6 +339,16 @@ def main():
   opt_input(parser_columns)
   parser_columns.add_argument(
       "columns", nargs="+", metavar="column", help="a column to output")
+
+  parser_sort = subparsers.add_parser("sort", help="sort help")
+  opt_input(parser_sort)
+  parser_sort.add_argument(
+      "-n", "--numeric", action="store_true",
+      help="whether or not to sort numerically")
+  parser_sort.add_argument(
+      "-r", "--reverse", action="store_true",
+      help="whether or not to sort in reverse")
+  parser_sort.add_argument("column", help="a column to sort by")
 
   parser_display = subparsers.add_parser(
       "display", help="display help",
