@@ -16,6 +16,7 @@
 #
 
 import os
+import csv
 import sys
 import errno
 import argparse
@@ -57,6 +58,17 @@ def body(input):
   next(input)
   for line in input:
     print line.rstrip("\r\n")
+
+
+def tocsv(input):
+	out = csv.writer(sys.stdout)
+	for line in input:
+		out.writerow(line.rstrip("\r\n").split("\t"))
+
+
+def fromcsv(input):
+	for row in csv.reader(input):
+		print "\t".join((x.replace("\t", " "*8) for x in row))
 
 
 def uniq(input):
@@ -323,6 +335,12 @@ def main():
 
   parser_body = subparsers.add_parser("body", help="body help")
   pos_input(parser_body)
+
+  parser_tocsv = subparsers.add_parser("tocsv", help="tocsv help")
+  pos_input(parser_tocsv)
+
+  parser_fromcsv = subparsers.add_parser("fromcsv", help="fromcsv help")
+  pos_input(parser_fromcsv)
 
   parser_cat = subparsers.add_parser("cat", help="cat help")
   parser_cat.add_argument(
