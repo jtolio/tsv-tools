@@ -4,18 +4,18 @@ usage: tsv [-h]
 
 positional arguments:
   {body,tocsv,fromcsv,cat,columns,sort,display,filter,header,uniq}
-                        subcommand help
-    body                body help
-    tocsv               tocsv help
-    fromcsv             fromcsv help
-    cat                 cat help
-    columns             columns help
-    sort                sort help
-    display             display help
-    filter              filter help
-    header              header help
-    uniq                uniq help
+                        subcommand
+    body                outputs all rows except for the header
+    tocsv               convert tsv input to a csv
+    fromcsv             convert a csv to tsv output
+    cat                 concatenate multiple tsvs, joining intelligently based
+                        on headers
+    columns             output a subset of columns
+    sort                sort rows, respecting the header
+    display             print tsv data with nicely space-padded output
+    filter              filter rows by a number of optional column selectors
+    header              only display the tsv header
+    uniq                only output unique rows
 
 optional arguments:
   -h, --help            show this help message and exit
-

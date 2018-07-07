@@ -61,14 +61,14 @@ def body(input):
 
 
 def tocsv(input):
-	out = csv.writer(sys.stdout)
-	for line in input:
-		out.writerow(line.rstrip("\r\n").split("\t"))
+  out = csv.writer(sys.stdout)
+  for line in input:
+    out.writerow(line.rstrip("\r\n").split("\t"))
 
 
 def fromcsv(input):
-	for row in csv.reader(input):
-		print "\t".join((x.replace("\t", " "*8) for x in row))
+  for row in csv.reader(input):
+    print "\t".join((x.replace("\t", " "*8) for x in row))
 
 
 def uniq(input):
@@ -234,21 +234,36 @@ def _fileset(name, filename, _cache={}):
 
 
 COMPARISONS = {
-  "=": _numerical(lambda x, y: x == y),
-  "==": _numerical(lambda x, y: x == y),
-  "!=": _numerical(lambda x, y: x != y),
-  "<=": _numerical(lambda x, y: x <= y),
-  ">=": _numerical(lambda x, y: x >= y),
-  "<": _numerical(lambda x, y: x < y),
-  ">": _numerical(lambda x, y: x > y),
-  " in ": _fileset,
-  " not in ": lambda x, y: not _fileset(x, y),
-  " contains ": lambda x, y: y in x,
-  " not contains ": lambda x, y: y not in x,
-  " starts with ": lambda x, y: x.startswith(y),
-  " not starts with ": lambda x, y: not x.startswith(y),
-  " endswith ": lambda x, y: x.endswith(y),
-  " not ends with ": lambda x, y: not x.endswith(y),
+  "=": (_numerical(lambda x, y: x == y),
+        "keep row if column x is equal to value y"),
+  "==": (_numerical(lambda x, y: x == y),
+        "keep row if column x is equal to value y"),
+  "!=": (_numerical(lambda x, y: x != y),
+        "keep row if column x is not equal to value y"),
+  "<=": (_numerical(lambda x, y: x <= y),
+        "keep row if column x is less than or equal to value y"),
+  ">=": (_numerical(lambda x, y: x >= y),
+        "keep row if column x is greater than or equal to value y"),
+  "<": (_numerical(lambda x, y: x < y),
+        "keep row if column x is less than value y"),
+  ">": (_numerical(lambda x, y: x > y),
+        "keep row if column x is greater than value y"),
+  " in ": (_fileset,
+        "keep row if column x is a line in the file y"),
+  " not in ": (lambda x, y: not _fileset(x, y),
+        "keep row if column x is not a line in the file y"),
+  " contains ": (lambda x, y: y in x,
+        "keep row if column x contains value y"),
+  " not contains ": (lambda x, y: y not in x,
+        "keep row if column x does not contain value y"),
+  " starts with ": (lambda x, y: x.startswith(y),
+        "keep row if column x starts with y"),
+  " not starts with ": (lambda x, y: not x.startswith(y),
+        "keep row if column x does not start with y"),
+  " endswith ": (lambda x, y: x.endswith(y),
+        "keep row if column x ends with y"),
+  " not ends with ": (lambda x, y: not x.endswith(y),
+        "keep row if column x does not end with y"),
 }
 
 
@@ -263,7 +278,7 @@ def filter(input, selectors, case_insensitive):
         continue
       key, val = selector.split(comp)
       if case_insensitive: val = val.lower()
-      selections.append((key.strip(), COMPARISONS[comp], val.strip()))
+      selections.append((key.strip(), COMPARISONS[comp][0], val.strip()))
       found = True
       break
     if not found:
@@ -321,7 +336,7 @@ def sort(input, column, numeric, reverse):
 
 def main():
   parser = argparse.ArgumentParser(prog="tsv")
-  subparsers = parser.add_subparsers(help="subcommand help", dest="subcommand")
+  subparsers = parser.add_subparsers(help="subcommand", dest="subcommand")
 
   def pos_input(parser):
     parser.add_argument(
@@ -333,16 +348,20 @@ def main():
         "-i", "--input", type=argparse.FileType("r"), default=sys.stdin,
         help="the path to read. if not provided, reads from stdin")
 
-  parser_body = subparsers.add_parser("body", help="body help")
+  parser_body = subparsers.add_parser("body",
+      help="outputs all rows except for the header")
   pos_input(parser_body)
 
-  parser_tocsv = subparsers.add_parser("tocsv", help="tocsv help")
+  parser_tocsv = subparsers.add_parser("tocsv",
+      help="convert tsv input to a csv")
   pos_input(parser_tocsv)
 
-  parser_fromcsv = subparsers.add_parser("fromcsv", help="fromcsv help")
+  parser_fromcsv = subparsers.add_parser("fromcsv",
+      help="convert a csv to tsv output")
   pos_input(parser_fromcsv)
 
-  parser_cat = subparsers.add_parser("cat", help="cat help")
+  parser_cat = subparsers.add_parser("cat",
+    help="concatenate multiple tsvs, joining intelligently based on headers")
   parser_cat.add_argument(
       "-j", "--join", choices=["x", "exact", "u", "union", "i", "intersect"],
       default="exact",
@@ -353,12 +372,14 @@ def main():
       metavar="input",
       help="the path(s) to read. if not provided, reads from stdin")
 
-  parser_columns = subparsers.add_parser("columns", help="columns help")
+  parser_columns = subparsers.add_parser("columns",
+      help="output a subset of columns")
   opt_input(parser_columns)
   parser_columns.add_argument(
       "columns", nargs="+", metavar="column", help="a column to output")
 
-  parser_sort = subparsers.add_parser("sort", help="sort help")
+  parser_sort = subparsers.add_parser("sort",
+      help="sort rows, respecting the header")
   opt_input(parser_sort)
   parser_sort.add_argument(
       "-n", "--numeric", action="store_true",
@@ -369,7 +390,7 @@ def main():
   parser_sort.add_argument("column", help="a column to sort by")
 
   parser_display = subparsers.add_parser(
-      "display", help="display help",
+      "display", help="print tsv data with nicely space-padded output",
       description=("nicely format tab-separated data without loading "
                    "everything into ram"))
   opt_input(parser_display)
@@ -380,7 +401,13 @@ def main():
       "-r", "--initial-rows", type=int, metavar="rows",
       help="how much input to read before starting output", default=100)
 
-  parser_filter = subparsers.add_parser("filter", help="filter help")
+  sellen = max(*map(len, COMPARISONS.keys())) + len("  x  y:")
+  parser_filter = subparsers.add_parser("filter",
+      help="filter rows by a number of optional column selectors",
+      formatter_class=argparse.RawDescriptionHelpFormatter,
+      description=("possible selectors:\n" + "\n".join(
+                   [("  x %s y:" % comp[0].strip()).ljust(sellen) + comp[1][1]
+                    for comp in sorted(COMPARISONS.items())])))
   opt_input(parser_filter)
   parser_filter.add_argument(
       "-c", "--case-insensitive", action="store_true",
@@ -389,10 +416,11 @@ def main():
       "selectors", metavar="selector", nargs="+",
       help="a constraint to filter the data with")
 
-  parser_header = subparsers.add_parser("header", help="header help")
+  parser_header = subparsers.add_parser("header",
+      help="only display the tsv header")
   pos_input(parser_header)
 
-  parser_uniq = subparsers.add_parser("uniq", help="uniq help")
+  parser_uniq = subparsers.add_parser("uniq", help="only output unique rows")
   pos_input(parser_uniq)
 
   args = sys.argv[:]
