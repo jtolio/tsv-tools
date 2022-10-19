@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 #
 # Copyright 2016 JT Olds
 #
@@ -27,7 +27,7 @@ from collections import defaultdict
 class TSV(object):
 
   def __init__(self, fh):
-    if isinstance(fh, basestring):
+    if isinstance(fh, str):
       fh = file(fh)
     self._lines = iter(fh)
     self._header = next(self._lines).rstrip("\r\n")
@@ -39,12 +39,12 @@ class TSV(object):
   def __iter__(self):
     return self
 
-  def next(self):
+  def __next__(self):
     fields = next(self._lines).rstrip("\r\n").split("\t")
     item = {}
     for i, field in enumerate(fields):
       item[i] = field
-    for name, pos_list in self._lookup.iteritems():
+    for name, pos_list in self._lookup.items():
       filtered = [fields[pos] for pos in pos_list if pos < len(fields)]
       if not filtered: continue
       if len(filtered) == 1:
@@ -57,7 +57,7 @@ class TSV(object):
 def body(input):
   next(input)
   for line in input:
-    print line.rstrip("\r\n")
+    print(line.rstrip("\r\n"))
 
 
 def tocsv(input):
@@ -68,7 +68,7 @@ def tocsv(input):
 
 def fromcsv(input):
   for row in csv.reader(input):
-    print "\t".join((x.replace("\t", " "*8) for x in row))
+    print("\t".join((x.replace("\t", " "*8) for x in row)))
 
 
 def uniq(input):
@@ -76,11 +76,22 @@ def uniq(input):
   lines = [line.rstrip("\r\n") for line in input]
   lines.sort()
   last = None
-  print header
+  print(header)
   for line in lines:
     if line == last: continue
     last = line
-    print line
+    print(line)
+
+
+def sum(input):
+  header = next(input).rstrip("\r\n").split("\t")
+  totals = [0.0] * len(header)
+  print("\t".join(header))
+  for row in input:
+      row = row.rstrip("\r\n").split("\t")
+      for i in range(len(row)):
+          totals[i] += float(row[i])
+  print("\t".join(map(str, totals)))
 
 
 def cat(inputs, join):
@@ -104,7 +115,7 @@ def cat(inputs, join):
     candidate = set(headers[0])
     for header in headers[1:]:
       if candidate != set(header):
-        print >>sys.stderr, "Error: headers do not match"
+        print("Error: headers do not match", file=sys.stderr)
         return 1
 
   elif join in ("i", "intersect", "intersection"):
@@ -113,7 +124,7 @@ def cat(inputs, join):
       candidate.intersection_update(set(header))
 
     if not candidate:
-      print >>sys.stderr, "Error: no overlapping columns"
+      print("Error: no overlapping columns", file=sys.stderr)
       return 0
 
     chosen_header = tuple(ref for ref in headers[0] if ref in candidate)
@@ -129,7 +140,7 @@ def cat(inputs, join):
           chosen_header.append(ref)
     chosen_header = tuple(chosen_header)
 
-  print "\t".join(field for field, _ in chosen_header)
+  print("\t".join(field for field, _ in chosen_header))
 
   for i, input in enumerate(inputs):
     if headers[i] == chosen_header:
@@ -147,7 +158,7 @@ def cat(inputs, join):
         else:
           parts.append("")
 
-      print "\t".join(parts)
+      print("\t".join(parts))
 
 
 def _get_header(input):
@@ -169,7 +180,7 @@ def columns(input, columns):
     for _ in lookup[column]:
       names.append(column)
 
-  print "\t".join(names)
+  print("\t".join(names))
 
   for line in input:
     fields = line.rstrip("\r\n").split("\t")
@@ -182,7 +193,7 @@ def columns(input, columns):
         else:
           parts.append("")
 
-    print "\t".join(parts)
+    print("\t".join(parts))
 
 
 def display(input, justify, initial_rows):
@@ -200,9 +211,9 @@ def display(input, justify, initial_rows):
 
   for fields in itertools.chain(
       list(itertools.islice(processor, initial_rows)), processor):
-    print " ".join((
+    print(" ".join((
         getattr(field, just)(max_widths[field_id])
-        for field_id, field in enumerate(fields)))
+        for field_id, field in enumerate(fields))))
 
 
 def _numerical(cmp):
@@ -268,7 +279,7 @@ COMPARISONS = {
 
 
 def filter(input, selectors, case_insensitive):
-  comparisons = list(sorted(COMPARISONS.keys(), key=len, reverse=True))
+  comparisons = list(sorted(list(COMPARISONS.keys()), key=len, reverse=True))
 
   selections = []
   for selector in selectors:
@@ -282,11 +293,11 @@ def filter(input, selectors, case_insensitive):
       found = True
       break
     if not found:
-      print >>sys.stderr, "Error: unknown selector %r" % selector
+      print("Error: unknown selector %r" % selector, file=sys.stderr)
       return 1
 
   header, lookup = _get_header(input)
-  print header
+  print(header)
 
   for line in input:
     line = line.rstrip("\r\n")
@@ -303,16 +314,16 @@ def filter(input, selectors, case_insensitive):
           good = False
           break
     if good:
-      print line
+      print(line)
 
 
 def header(input):
-  print next(input).rstrip("\r\n")
+  print(next(input).rstrip("\r\n"))
 
 
 def sort(input, column, numeric, reverse):
   header, lookup = _get_header(input)
-  print header
+  print(header)
 
   rows = []
   for line in input:
@@ -331,7 +342,7 @@ def sort(input, column, numeric, reverse):
   rows.sort(key=row_key, reverse=reverse)
 
   for row in rows:
-    print "\t".join(row)
+    print("\t".join(row))
 
 
 def main():
@@ -401,7 +412,7 @@ def main():
       "-r", "--initial-rows", type=int, metavar="rows",
       help="how much input to read before starting output", default=100)
 
-  sellen = max(*map(len, COMPARISONS.keys())) + len("  x  y:")
+  sellen = max(*list(map(len, list(COMPARISONS.keys())))) + len("  x  y:")
   parser_filter = subparsers.add_parser("filter",
       help="filter rows by a number of optional column selectors",
       formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -422,6 +433,9 @@ def main():
 
   parser_uniq = subparsers.add_parser("uniq", help="only output unique rows")
   pos_input(parser_uniq)
+
+  parser_sum = subparsers.add_parser("sum", help="add values in rows")
+  pos_input(parser_sum)
 
   args = sys.argv[:]
   if os.path.basename(args[0]).startswith("tsv-"):
